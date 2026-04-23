@@ -1,5 +1,4 @@
-import type { ChangeEvent } from 'react'
-import type { AppSettings } from '../types'
+
 
 type SettingsModalProps = {
   isOpen: boolean

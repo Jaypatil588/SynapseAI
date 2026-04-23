@@ -21,7 +21,6 @@ import { initializeDatabase, saveSessionState } from './lib/db'
 import type {
   AppSettings,
   ChatMessage,
-  ExportPayload,
   SuggestionBatch,
   SuggestionItem,
   TranscriptEntry,
@@ -71,7 +70,6 @@ function App() {
   const volumeIntervalRef = useRef<number | undefined>(undefined)
   const chunkIntervalRef = useRef<number | undefined>(undefined)
   const hasSpokenInChunkRef = useRef(false)
-  const sliceIsValidRef = useRef(false)
   
   const pendingManualRefreshRef = useRef(false)
 
