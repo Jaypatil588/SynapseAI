@@ -128,29 +128,38 @@ export function SettingsModal({
           </div>
 
           <label>
+            Transcription Hint (Whisper prompt — vocabulary & style, not instructions)
+            <textarea
+              rows={3}
+              value={settings.transcriptionPrompt}
+              onChange={(event) => onTextSettingChange('transcriptionPrompt', event)}
+            />
+          </label>
+
+          <label>
             Live Suggestion Prompt
             <textarea
-              rows={6}
+              rows={8}
               value={settings.liveSuggestionPrompt}
               onChange={(event) => onTextSettingChange('liveSuggestionPrompt', event)}
             />
           </label>
 
           <label>
-            Expanded Answer Prompt
+            Chat System Prompt
             <textarea
-              rows={5}
-              value={settings.expandedAnswerPrompt}
-              onChange={(event) => onTextSettingChange('expandedAnswerPrompt', event)}
+              rows={6}
+              value={settings.chatPrompt}
+              onChange={(event) => onTextSettingChange('chatPrompt', event)}
             />
           </label>
 
           <label>
-            Chat Prompt
+            Gap Summarizer Prompt (background transcript compression)
             <textarea
-              rows={5}
-              value={settings.chatPrompt}
-              onChange={(event) => onTextSettingChange('chatPrompt', event)}
+              rows={6}
+              value={settings.gapSummaryPrompt}
+              onChange={(event) => onTextSettingChange('gapSummaryPrompt', event)}
             />
           </label>
         </div>

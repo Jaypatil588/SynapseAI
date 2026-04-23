@@ -34,7 +34,7 @@ export function ControlBar({
   return (
     <header className="control-bar">
       <div className="control-bar__left">
-        <h1>TwinMind Live Suggestions</h1>
+        <h1>SynapseAI Live Suggestions</h1>
         <p>Transcript, suggestions, and chat in one real-time session.</p>
       </div>
 

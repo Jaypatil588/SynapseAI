@@ -61,34 +61,6 @@ export async function groqChatCompletion({
   return content
 }
 
-export async function groqCheckComplexity({
-  apiKey,
-  model,
-  userPrompt,
-}: {
-  apiKey: string
-  model: string
-  userPrompt: string
-}): Promise<'high' | 'low'> {
-  const systemPrompt = `You are an intent classifier. Evaluate the following user chat prompt and determine its complexity. 
-Complexity is "high" if:
-1. Tasks require 5+ logical reasoning steps (e.g. complex puzzles, data analysis, debugging).
-2. Problems need to satisfy many, often conflicting rules.
-3. There is no clear objective, and we need to deduce what is going on.
-Otherwise, complexity is "low".
-Return exactly the word "high" or "low" and nothing else.`;
-
-  const content = await groqChatCompletion({
-    apiKey,
-    model,
-    systemPrompt,
-    userPrompt,
-    temperature: 0.1,
-  });
-
-  if (content.toLowerCase().includes('high')) return 'high';
-  return 'low';
-}
 
 export async function groqStreamChatCompletion({
   apiKey,
@@ -122,19 +94,24 @@ export async function groqTranscribeAudio({
   apiKey,
   model,
   audio,
+  prompt,
 }: {
   apiKey: string
   model: string
   audio: Blob
+  prompt?: string
 }): Promise<string> {
   console.log(`[groqTranscribeAudio] Starting transcription. Model: ${model}, Audio Blob Size: ${audio.size}, Audio Blob Type: ${audio.type || 'unknown'}`);
   
   const formData = new FormData()
   formData.append('model', model)
-  formData.append('temperature', '0')
+  formData.append('temperature', '0.9')
   formData.append('response_format', 'verbose_json')
-  const contentType = (audio.type || 'application/octet-stream').split(';')[0]
-  const extension = extensionFromMimeType(contentType)
+  if (prompt) {
+    formData.append('prompt', prompt)
+  }
+  const contentType = 'audio/webm' 
+  const extension = 'webm'
   const filename = `chunk-${Date.now()}.${extension}`
   const file = new File([audio], filename, { type: contentType })
   formData.append('file', file)

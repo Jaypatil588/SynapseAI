@@ -57,7 +57,7 @@ export function ChatPanel({
           messages.map((message) => (
             <article className={`chat-message chat-message--${message.role}`} key={message.id}>
               <header>
-                <strong>{message.role === 'user' ? 'You' : 'TwinMind'}</strong>
+                <strong>{message.role === 'user' ? 'You' : 'SynapseAI'}</strong>
                 <time>{formatTime(message.timestamp)}</time>
               </header>
               <div className="markdown-body">

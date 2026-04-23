@@ -28,15 +28,62 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
+
+  /* Typography Scale */
+  --fs-xs: 0.75rem;     /* 12px */
+  --fs-sm: 0.875rem;    /* 14px */
+  --fs-base: 1rem;      /* 16px */
+  --fs-lg: 1.125rem;    /* 18px */
+  --fs-xl: 1.25rem;     /* 20px */
+  --fs-2xl: 1.5rem;     /* 24px */
+  --fs-3xl: 2rem;       /* 32px */
+
+  --fw-light: 300;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --lh-tight: 1.2;
+  --lh-base: 1.5;
+  --lh-relaxed: 1.625;
+
+  --ls-tight: -0.025em;
+  --ls-normal: 0;
+  --ls-wide: 0.025em;
   
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  font-weight: var(--fw-normal);
   color: var(--text-primary);
   background: var(--bg-base);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
+}
+
+h1 { font-size: var(--fs-2xl); }
+h2 { font-size: var(--fs-xl); }
+h3 { font-size: var(--fs-lg); }
+h4 { font-size: var(--fs-base); }
+
+p {
+  margin: 0;
+  line-height: var(--lh-base);
+}
+
+small {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 * { box-sizing: border-box; }
@@ -581,17 +628,17 @@ button, input, textarea { font: inherit; }
 }
 
 .feature-card__title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
   color: var(--text-primary);
   margin: 0 0 0.5rem;
 }
 
 .feature-card__desc {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin: 0 0 1rem;
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 
 .feature-card__link {
@@ -637,16 +684,15 @@ button, input, textarea { font: inherit; }
 }
 
 .control-bar__left h1 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
 }
 
 .control-bar__left p {
-  margin: 0.1rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
 }
 
 .control-bar__actions {
@@ -709,8 +755,10 @@ button, input, textarea { font: inherit; }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
+  font-weight: var(--fw-medium);
 }
 
 /* ─── BANNERS ─── */
@@ -765,12 +813,11 @@ button, input, textarea { font: inherit; }
 }
 
 .panel__header h2 {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .panel__content {
@@ -789,8 +836,9 @@ button, input, textarea { font: inherit; }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.12rem 0.45rem;
-  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
   color: var(--text-muted);
 }
 
@@ -848,13 +896,20 @@ button, input, textarea { font: inherit; }
 
 .transcript-line time {
   display: block;
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   color: var(--text-muted);
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.25rem;
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-wide);
 }
 
-.transcript-line p { margin: 0; font-size: 0.86rem; color: var(--text-primary); }
+.transcript-line p { 
+  margin: 0; 
+  font-size: var(--fs-sm); 
+  line-height: var(--lh-relaxed);
+  color: var(--text-primary); 
+}
 
 /* ─── SUGGESTIONS ─── */
 .suggestion-batch {
@@ -894,19 +949,30 @@ button, input, textarea { font: inherit; }
 
 .suggestion-type {
   display: inline-block;
-  margin-bottom: 0.3rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   color: var(--accent);
   background: var(--accent-dim);
   border-radius: 999px;
-  padding: 0.08rem 0.42rem;
+  padding: 0.12rem 0.5rem;
 }
 
-.suggestion-card p { margin: 0; color: var(--text-primary); font-size: 0.84rem; }
-.suggestion-card small { display: block; margin-top: 0.35rem; color: var(--text-muted); font-size: 0.72rem; }
+.suggestion-card p { 
+  margin: 0; 
+  color: var(--text-primary); 
+  font-size: var(--fs-sm); 
+  line-height: var(--lh-base);
+}
+.suggestion-card small { 
+  display: block; 
+  margin-top: 0.5rem; 
+  color: var(--text-muted); 
+  font-size: var(--fs-xs); 
+  font-weight: var(--fw-medium);
+}
 
 /* ─── CHAT ─── */
 .chat-message {
@@ -927,12 +993,27 @@ button, input, textarea { font: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.5rem;
 }
 
-.chat-message strong { font-size: 0.74rem; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.chat-message time { font-size: 0.68rem; color: var(--text-muted); }
-.chat-message p { margin: 0; white-space: pre-wrap; font-size: 0.86rem; color: var(--text-primary); }
+.chat-message strong { 
+  font-size: var(--fs-xs); 
+  color: var(--text-secondary); 
+  font-weight: var(--fw-bold); 
+  letter-spacing: var(--ls-wide); 
+  text-transform: uppercase; 
+}
+.chat-message time { 
+  font-size: var(--fs-xs); 
+  color: var(--text-muted); 
+}
+.chat-message p { 
+  margin: 0; 
+  white-space: pre-wrap; 
+  font-size: var(--fs-sm); 
+  line-height: var(--lh-relaxed);
+  color: var(--text-primary); 
+}
 
 .chat-form {
   border-top: 1px solid var(--border);
@@ -965,9 +1046,9 @@ button, input, textarea { font: inherit; }
   background: var(--accent);
   color: #000;
   border-radius: var(--radius-sm);
-  padding: 0.4rem 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1257,3 +1338,4 @@ button, input, textarea { font: inherit; }
   color: #FFF000 !important;
   border: 1px solid rgba(255, 240, 0, 0.3) !important;
 }
+

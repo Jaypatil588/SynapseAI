@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "groq-sdk": "^1.1.2",
-    "hark": "^1.2.3",
     "idb": "^8.0.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -25,7 +24,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/hark": "^1.2.3",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

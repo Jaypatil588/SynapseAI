@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import hark from 'hark'
 import { ChatPanel } from './components/ChatPanel'
 import { ControlBar } from './components/ControlBar'
 import { ApiTestLab } from './components/ApiTestLab'
@@ -69,11 +68,11 @@ function App() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
-  const harkRef = useRef<hark.Harker | null>(null)
-  const silenceTimeoutRef = useRef<number | undefined>(undefined)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const volumeIntervalRef = useRef<number | undefined>(undefined)
+  const chunkIntervalRef = useRef<number | undefined>(undefined)
   const hasSpokenInChunkRef = useRef(false)
   const sliceIsValidRef = useRef(false)
-  const maxChunkTimeoutRef = useRef<number | undefined>(undefined)
   
   const pendingManualRefreshRef = useRef(false)
 
@@ -89,6 +88,7 @@ function App() {
   const isGeneratingGapSummaryRef = useRef(false)
 
   const lastSuggestionGenAtRef = useRef(0);
+  const batchCounterRef = useRef(0);
 
   const transcriptionQueueRef = useRef<Blob[]>([])
   const isProcessingTranscriptionQueueRef = useRef(false)
@@ -186,17 +186,17 @@ function App() {
       const latestNewEntryId = newEntriesForSummary[newEntriesForSummary.length - 1].id;
       const newText = newEntriesForSummary.map(e => e.text).join('\n');
 
-      const systemPrompt = "You are an expert secretary generating a highly condensed running summary of a transcript gap. Keep only factual data, key decisions, topics, and actionable items. Do NOT chatter or write pleasantries. Max length 400 words.";
+      const systemPrompt = settingsRef.current.gapSummaryPrompt;
       const userPrompt = gapSummaryRef.current
-        ? `We have an existing running summary:\n<summary>\n${gapSummaryRef.current}\n</summary>\n\nPlease integrate these NEW transcript lines into the summary, maintaining chronological flow:\n<new_lines>\n${newText}\n</new_lines>`
-        : `Please summarize these transcript lines:\n<new_lines>\n${newText}\n</new_lines>`;
+        ? `EXISTING RUNNING SUMMARY:\n<summary>\n${gapSummaryRef.current}\n</summary>\n\nNEW TRANSCRIPT LINES TO INTEGRATE:\n<new_lines>\n${newText}\n</new_lines>\n\nUpdate the summary by integrating these new lines chronologically. Do not duplicate existing content.`
+        : `Summarize these transcript lines into a dense factual archive:\n<new_lines>\n${newText}\n</new_lines>`;
 
       const newSummary = await groqChatCompletion({
         apiKey: trimmedKey,
-        model: 'llama3-8b-8192', // ultrafast, cheap background model
+        model: settingsRef.current.generationModel,
         systemPrompt,
         userPrompt,
-        temperature: 0.1
+        temperature: 0.8
       });
 
       setGapSummary(newSummary);
@@ -256,55 +256,70 @@ function App() {
         return
       }
 
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
       mediaStreamRef.current = stream
 
-      const speechEvents = hark(stream, { threshold: -65, interval: 100 })
-      harkRef.current = speechEvents
+      // Initialize native Web Audio analyzer for volume filtering
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyzer = audioContext.createAnalyser()
+      analyzer.fftSize = 256
+      source.connect(analyzer)
+      
+      const dataArray = new Uint8Array(analyzer.frequencyBinCount)
 
-      const sliceAndResetChunk = () => {
-        if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
-          sliceIsValidRef.current = true
-          mediaRecorderRef.current.requestData()
-          hasSpokenInChunkRef.current = false
-          if (maxChunkTimeoutRef.current !== undefined) {
-            window.clearTimeout(maxChunkTimeoutRef.current)
-            maxChunkTimeoutRef.current = undefined
-          }
-        }
-      }
-
-      speechEvents.on('speaking', () => {
-        if (silenceTimeoutRef.current !== undefined) {
-          window.clearTimeout(silenceTimeoutRef.current)
-        }
+      // Poll volume periodically. If it exceeds a static threshold (e.g. 15 on a 0-255 scale), flag the chunk.
+      volumeIntervalRef.current = window.setInterval(() => {
+        analyzer.getByteFrequencyData(dataArray)
+        let sum = 0
+        for (let i = 0; i < dataArray.length; i++) { sum += dataArray[i] }
+        const average = sum / dataArray.length
         
-        if (!hasSpokenInChunkRef.current) {
-          if (maxChunkTimeoutRef.current !== undefined) {
-            window.clearTimeout(maxChunkTimeoutRef.current)
-          }
-          maxChunkTimeoutRef.current = window.setTimeout(() => {
-            sliceAndResetChunk()
-          }, 6000)
+        if (average > 15) {
+          hasSpokenInChunkRef.current = true
         }
+      }, 100)
 
-        hasSpokenInChunkRef.current = true
-      })
-
-      speechEvents.on('stopped_speaking', () => {
-        silenceTimeoutRef.current = window.setTimeout(() => {
-          sliceAndResetChunk()
-        }, 1000)
-      })
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (!event.data || event.data.size < 1000) return
+      const handleDataAvailable = (event: BlobEvent) => {
+        if (!event.data || event.data.size < 4000) return // Increase to 4KB to avoid header-only/empty chunks
         if (sliceIsValidRef.current) {
           enqueueTranscriptionChunk(event.data)
           sliceIsValidRef.current = false
         }
       }
+
+      const options = { mimeType: 'audio/webm' }
+      const mediaRecorder = new MediaRecorder(stream, options)
+      mediaRecorderRef.current = mediaRecorder
+      mediaRecorder.ondataavailable = handleDataAvailable
+
+      const sliceAndResetChunk = () => {
+        // Did volume spike in the last 6s?
+        if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
+          sliceIsValidRef.current = true
+        } else {
+          sliceIsValidRef.current = false
+        }
+
+        if (mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop()
+        }
+
+        if (mediaStreamRef.current) {
+          const options = { mimeType: 'audio/webm' }
+          const newRecorder = new MediaRecorder(mediaStreamRef.current, options)
+          newRecorder.ondataavailable = handleDataAvailable
+          newRecorder.start()
+          mediaRecorderRef.current = newRecorder
+        }
+
+        hasSpokenInChunkRef.current = false
+      }
+
+      // Fixed 6-second hardware interval
+      chunkIntervalRef.current = window.setInterval(sliceAndResetChunk, 6000)
+
+
 
       mediaRecorder.start()
       setIsRecording(true)
@@ -317,20 +332,20 @@ function App() {
   }
 
   function stopRecordingStream() {
-    if (silenceTimeoutRef.current !== undefined) {
-      window.clearTimeout(silenceTimeoutRef.current)
-      silenceTimeoutRef.current = undefined
+    if (volumeIntervalRef.current !== undefined) {
+      window.clearInterval(volumeIntervalRef.current)
+      volumeIntervalRef.current = undefined
     }
 
-    if (maxChunkTimeoutRef.current !== undefined) {
-      window.clearTimeout(maxChunkTimeoutRef.current)
-      maxChunkTimeoutRef.current = undefined
+    if (chunkIntervalRef.current !== undefined) {
+      window.clearInterval(chunkIntervalRef.current)
+      chunkIntervalRef.current = undefined
     }
 
-    if (harkRef.current) {
-      harkRef.current.stop()
-      harkRef.current = null
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      void audioContextRef.current.close()
     }
+    audioContextRef.current = null
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
@@ -344,6 +359,7 @@ function App() {
 
     lastSuggestionGenAtRef.current = 0;
     lastGapSummaryGenAtRef.current = 0;
+    batchCounterRef.current = 0;
     transcriptionQueueRef.current = []
     isProcessingTranscriptionQueueRef.current = false
   }
@@ -374,6 +390,7 @@ function App() {
             apiKey: trimmedKey,
             model: settingsRef.current.transcriptionModel,
             audio: chunk,
+            prompt: settingsRef.current.transcriptionPrompt || undefined,
           })
 
           const normalizedText = normalizeChunkText(text, transcriptRef.current)
@@ -452,17 +469,18 @@ function App() {
         extendedSystemPrompt += `\n\nNEGATIVE BIAS: Do NOT generate suggestions matching or repeating these recent ones: ${recentSuggestionsText}`;
       }
 
-      const promptFull = userPrompt + '\nGenerate a mix of types: "question_to_ask", "talking_point", "fact_check", "answer".';
+      const promptFull = userPrompt;
 
       const rawSuggestions = await groqChatCompletion({
         apiKey: trimmedKey,
         model: settingsRef.current.generationModel,
         systemPrompt: extendedSystemPrompt,
         userPrompt: promptFull,
-        temperature: 0.6,
+        temperature: 0.8,
       });
 
-      let mergedSuggestions = parseSuggestionResponse(rawSuggestions).slice(0, 3)
+      const { items: parsedItems, typeRanking } = parseSuggestionResponse(rawSuggestions)
+      let mergedSuggestions = parsedItems
       if (mergedSuggestions.length < 3) {
         const fallback = fallbackSuggestions(currentTranscript)
         mergedSuggestions = [...mergedSuggestions, ...fallback].slice(0, 3)
@@ -470,8 +488,10 @@ function App() {
 
       const batch: SuggestionBatch = {
         id: uid('batch'),
+        batchNumber: batchCounterRef.current++,
         timestamp: nowIso(),
         items: mergedSuggestions,
+        typeRanking,
       }
 
       setSuggestionBatches((previous) => [batch, ...previous])
@@ -612,13 +632,13 @@ function App() {
         }
       ]);
 
-      // Stream directly — skip complexity classifier to save TPM
+      // Stream directly — chatPrompt handles both suggestion drill-down and free-form chat
       const stream = await groqStreamChatCompletion({
         apiKey: trimmedKey,
         model: settingsRef.current.generationModel,
         systemPrompt: settingsRef.current.chatPrompt,
-        userPrompt: `${settingsRef.current.expandedAnswerPrompt}\n\n${prompt}`,
-        temperature: 0.3,
+        userPrompt: prompt,
+        temperature: 0.8,
         isHighComplexity: false
       });
 
@@ -661,11 +681,6 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
-  const hasSessionData = useMemo(
-    () => transcript.length || suggestionBatches.length || chatHistory.length,
-    [transcript.length, suggestionBatches.length, chatHistory.length],
-  )
-
   function handleStartSession() {
     setActiveView('session')
   }
@@ -699,13 +714,9 @@ function App() {
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
 
-            {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
 
-            {!hasSessionData ? (
-              <div className="hint-banner">
-                Start microphone recording. Hark semantic speech detection isolates valid audio dynamically. Suggestions refresh every ~{suggestionCadenceSeconds}s.
-              </div>
-            ) : null}
+
+
 
             <main className="three-column-layout">
               <TranscriptPanel

@@ -80,10 +80,15 @@ export function transcriptToContextBounded(
   return { head: headLines.join('\n'), tail: tailLines.join('\n'), omittedEntries }
 }
 
-export function parseSuggestionResponse(raw: string): SuggestionItem[] {
-  const cleaned = raw.trim().replace(/^```json\s*/i, '').replace(/```$/, '')
-  const parsed = JSON.parse(cleaned) as {
-    suggestions?: Array<{ type?: string; preview?: string; whyNow?: string }>
+export function parseSuggestionResponse(
+  raw: string
+): { items: SuggestionItem[]; typeRanking: Record<SuggestionType, number> } {
+  const defaultRanking: Record<SuggestionType, number> = {
+    question_to_ask: 1,
+    talking_point: 2,
+    answer: 3,
+    fact_check: 4,
+    clarification: 5,
   }
 
   const allowedTypes: SuggestionType[] = [
@@ -94,23 +99,45 @@ export function parseSuggestionResponse(raw: string): SuggestionItem[] {
     'clarification',
   ]
 
-  const suggestions = (parsed.suggestions ?? [])
-    .slice(0, 3)
-    .map((item) => {
-      const type = allowedTypes.includes(item.type as SuggestionType)
-        ? (item.type as SuggestionType)
-        : 'clarification'
+  try {
+    const cleaned = raw.trim().replace(/^```json\s*/i, '').replace(/```$/, '')
+    const parsed = JSON.parse(cleaned) as {
+      typeRanking?: Record<string, number>
+      suggestions?: Array<{ type?: string; preview?: string; whyNow?: string; rank?: number }>
+    }
 
-      return {
-        id: uid('suggestion'),
-        type,
-        preview: (item.preview ?? '').trim(),
-        whyNow: (item.whyNow ?? '').trim(),
+    const typeRanking: Record<SuggestionType, number> = { ...defaultRanking }
+    if (parsed.typeRanking) {
+      for (const type of allowedTypes) {
+        const val = parsed.typeRanking[type]
+        if (typeof val === 'number' && val >= 1 && val <= 5) {
+          typeRanking[type] = val
+        }
       }
-    })
-    .filter((item) => item.preview.length > 0)
+    }
 
-  return suggestions
+    const items: SuggestionItem[] = (parsed.suggestions ?? [])
+      .map((item) => {
+        const type = allowedTypes.includes(item.type as SuggestionType)
+          ? (item.type as SuggestionType)
+          : 'clarification'
+        const rank = typeRanking[type] ?? 99
+        return {
+          id: uid('suggestion'),
+          type,
+          preview: (item.preview ?? '').trim(),
+          whyNow: (item.whyNow ?? '').trim(),
+          rank,
+        }
+      })
+      .filter((item) => item.preview.length > 0)
+      .sort((a, b) => a.rank - b.rank) // best rank (1) first
+      .slice(0, 3) // top 3 to display
+
+    return { items, typeRanking }
+  } catch {
+    return { items: [], typeRanking: defaultRanking }
+  }
 }
 
 export function fallbackSuggestions(transcript: TranscriptEntry[]): SuggestionItem[] {
@@ -122,18 +149,21 @@ export function fallbackSuggestions(transcript: TranscriptEntry[]): SuggestionIt
       type: 'clarification',
       preview: `Clarify the main objective from this point: "${latest.slice(0, 80)}"`,
       whyNow: 'Helps align everyone on what success looks like right now.',
+      rank: 99,
     },
     {
       id: uid('suggestion'),
       type: 'question_to_ask',
       preview: 'Ask what decision is needed in the next 10 minutes and who owns it.',
       whyNow: 'Pushes the conversation toward commitment and ownership.',
+      rank: 99,
     },
     {
       id: uid('suggestion'),
       type: 'talking_point',
       preview: 'Summarize what is confirmed vs unknown before moving to next topic.',
       whyNow: 'Prevents confusion and reduces rework later.',
+      rank: 99,
     },
   ]
 }

@@ -16,12 +16,17 @@ export type SuggestionItem = {
   preview: string
   type: SuggestionType
   whyNow: string
+  rank: number // 1 = highest relevance, 5 = lowest
 }
+
+export type TypeRanking = Record<SuggestionType, number>
 
 export type SuggestionBatch = {
   id: string
+  batchNumber: number
   timestamp: string
-  items: SuggestionItem[]
+  items: SuggestionItem[]      // all 5, sorted by rank asc
+  typeRanking: TypeRanking     // raw ranking from model: type → rank (1=best)
 }
 
 export type ChatRole = 'user' | 'assistant'
@@ -41,9 +46,10 @@ export type AppSettings = {
   liveSuggestionContextEntries: number
   expandedAnswerContextEntries: number
   chatContextEntries: number
+  transcriptionPrompt: string
   liveSuggestionPrompt: string
-  expandedAnswerPrompt: string
   chatPrompt: string
+  gapSummaryPrompt: string
   databaseUrl: string
 }
 

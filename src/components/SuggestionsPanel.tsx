@@ -66,7 +66,7 @@ export function SuggestionsPanel({
           batches.map((batch) => (
             <article className="suggestion-batch" key={batch.id}>
               <header>
-                <h3>Batch {batch.id.slice(-4)}</h3>
+                <h3>Batch {batch.batchNumber}</h3>
                 <time>{formatTime(batch.timestamp)}</time>
               </header>
 
