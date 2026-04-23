@@ -2,11 +2,9 @@
 
 export function TopNav() {
   return (
-    <nav className="top-nav" style={{ justifyContent: 'space-between' }}>
+    <nav className="top-nav">
       <div className="top-nav__links">
-        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-          SynapseAI
-        </h2>
+        <h2 className="top-nav__brand">SynapseAI</h2>
       </div>
     </nav>
   );

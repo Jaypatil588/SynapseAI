@@ -47,16 +47,16 @@ export function ControlBar({
           {isRecording ? 'Stop Recording' : 'Start Mic'}
         </button>
         <button
+          className="control-bar__toggle-btn"
           onClick={onToggleLargeModel}
           title={isLargeModel ? 'Using gpt-oss-120b (click to switch to 20b)' : 'Using gpt-oss-20b (click to switch to 120b)'}
-          style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
         >
           {isLargeModel ? '120b ⚡' : '20b'}
         </button>
         <button
+          className="control-bar__toggle-btn"
           onClick={onToggleLanguage}
           title={transcribeLanguage === 'en' ? 'Enforcing English transcription (click for auto-detect)' : 'Auto-detecting language (click to enforce English)'}
-          style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
         >
           {transcribeLanguage === 'en' ? 'EN' : 'AUTO'}
         </button>

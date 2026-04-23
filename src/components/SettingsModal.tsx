@@ -39,10 +39,9 @@ export function SettingsModal({
             />
           </label>
           <button 
-            className="primary" 
+            className="modal-submit-btn primary" 
             onClick={onClose}
             disabled={!apiKey.trim()}
-            style={{ marginTop: '1rem', width: '100%' }}
           >
             Submit
           </button>

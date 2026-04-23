@@ -56,9 +56,9 @@ export function TranscriptPanel({
             onChange={(e) => onUserContextChange(e.target.value)}
             rows={2}
           />
-          <details style={{ marginTop: '0.75rem', fontSize: '0.85em', color: '#4a6475' }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>View Sliding Window Context (Last 5 Mins)</summary>
-            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', maxHeight: '150px', overflowY: 'auto', background: '#eef2f5', padding: '0.5rem', borderRadius: '4px' }}>
+          <details className="context-details">
+            <summary>View Sliding Window Context (Last 5 Mins)</summary>
+            <div className="context-details__content">
               {slidingWindowContext}
             </div>
           </details>
