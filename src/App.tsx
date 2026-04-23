@@ -846,11 +846,6 @@ Use your internet search capabilities to generate a thorough, detailed, and expa
               />
             </main>
 
-            <ApiTestLab
-              apiKey={apiKey}
-              chatModel={settings.generationModel}
-              transcriptionModel={settings.transcriptionModel}
-            />
           </div>
         )}
 
