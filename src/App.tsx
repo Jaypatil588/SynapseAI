@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChatPanel } from './components/ChatPanel'
 import { ControlBar } from './components/ControlBar'
-import { ApiTestLab } from './components/ApiTestLab'
 import { SettingsModal } from './components/SettingsModal'
 import { SuggestionsPanel } from './components/SuggestionsPanel'
 import { TranscriptPanel } from './components/TranscriptPanel'
