@@ -11,6 +11,7 @@ import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY } from './lib/defaults'
 import { groqChatCompletion, groqStreamChatCompletion, groqTranscribeAudio } from './lib/groq'
 import {
   fallbackSuggestions,
+  isCommonWhisperHallucination,
   nowIso,
   parseSuggestionResponse,
   transcriptToContext,
@@ -869,6 +870,7 @@ export default App
 function normalizeChunkText(chunkText: string, transcript: TranscriptEntry[]): string {
   const normalized = chunkText.trim().replace(/\s+/g, ' ')
   if (!normalized) return ''
+  if (isCommonWhisperHallucination(normalized)) return ''
 
   const previousTail = transcript
     .slice(-2)

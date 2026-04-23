@@ -16,6 +16,70 @@ export function formatTime(iso: string): string {
   })
 }
 
+export function isCommonWhisperHallucination(text: string): boolean {
+  const raw = text.trim()
+  if (!raw) return true
+
+  // Music notes / non-speech artifacts
+  if (/^[🎵🎶♪♫]+$/.test(raw)) return true
+
+  // Ellipsis / placeholder noise like "... ... ... ..." or "…"
+  if (/^(?:\.\.\.|…)(?:[\s.]*)(?:(?:\.\.\.|…))*$/.test(raw)) return true
+
+  // Bracketed stage directions like "[Music]" / "(applause)"
+  const bracketed = raw.match(/^[\[(]\s*([a-zA-Z ]+)\s*[\])]$/)
+  if (bracketed) {
+    const inner = bracketed[1].trim().toLowerCase()
+    if (['music', 'applause', 'laughter', 'silence'].includes(inner)) return true
+  }
+
+  const normalized = raw
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const lower = normalized.toLowerCase()
+  const lowerNoPunct = lower.replace(/[.,!?]+$/g, '')
+
+  // Very short fillers that often appear as standalone hallucinations during silence
+  const exactFillers = new Set([
+    'so',
+    'hello',
+    'thank you',
+    'thanks',
+    'okay',
+    'ok',
+    'yeah',
+    'you',
+    'uh',
+    'um',
+    'umm',
+    'hmm',
+    'ah',
+    'bye',
+  ])
+  if (exactFillers.has(lowerNoPunct)) return true
+
+  // Common Whisper "YouTube outro" / subtitle watermark hallucinations
+  const containsPhrases = [
+    'thanks for watching',
+    'thank you for watching',
+    "don't forget to subscribe",
+    'please subscribe',
+    'subscribe to my channel',
+    'like and subscribe',
+    'subtitles by',
+    'amara.org',
+    'rev.com',
+    'otter.ai',
+    'transcribed by',
+  ]
+  if (containsPhrases.some((p) => lower.includes(p))) return true
+
+  return false
+}
+
 export function transcriptToContext(entries: TranscriptEntry[], limit: number): string {
   if (!entries.length) {
     return 'No transcript yet.'

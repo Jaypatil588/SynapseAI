@@ -97,6 +97,16 @@ export function ChatPanel({
           placeholder="Ask a question about this session..."
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            if (event.shiftKey) return
+            if (isLoading) return
+            const trimmed = input.trim()
+            if (!trimmed) return
+            event.preventDefault()
+            setInput('')
+            void onSubmitQuestion(trimmed)
+          }}
           rows={3}
         />
         <button type="submit" disabled={isLoading || !input.trim()}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatTime } from '../lib/utils'
+import { formatTime, isCommonWhisperHallucination } from '../lib/utils'
 import type { TranscriptEntry } from '../types'
 
 type TranscriptPanelProps = {
@@ -64,10 +64,12 @@ export function TranscriptPanel({
           </details>
         </div>
 
-        {entries.length === 0 ? (
+        {entries.filter((e) => !isCommonWhisperHallucination(e.text)).length === 0 ? (
           <p className="empty-state">Transcript chunks will appear here every ~30 seconds.</p>
         ) : (
-          entries.map((entry) => (
+          entries
+            .filter((entry) => !isCommonWhisperHallucination(entry.text))
+            .map((entry) => (
             <article className="transcript-line" key={entry.id}>
               <time>{formatTime(entry.timestamp)}</time>
               <p>{entry.text}</p>
