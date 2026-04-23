@@ -37,18 +37,23 @@ export function SuggestionsPanel({
   refreshCadenceSeconds,
   onSelectSuggestion,
 }: SuggestionsPanelProps) {
-  const [timeLeft, setTimeLeft] = useState(refreshCadenceSeconds)
+  const [nowTick, setNowTick] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!isRecording) {
-       setTimeLeft(refreshCadenceSeconds);
-       return;
-    }
-    const interval = setInterval(() => {
-      setTimeLeft(t => Math.max(0, t - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [lastRefreshAt, isRecording, refreshCadenceSeconds]);
+    if (!isRecording) return
+    const interval = window.setInterval(() => setNowTick(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [isRecording])
+
+  const timeLeft = (() => {
+    if (!isRecording) return refreshCadenceSeconds
+
+    const lastRefreshMs = lastRefreshAt ? Date.parse(lastRefreshAt) : NaN
+    if (!Number.isFinite(lastRefreshMs)) return refreshCadenceSeconds
+
+    const elapsedSeconds = Math.floor((nowTick - lastRefreshMs) / 1000)
+    return Math.max(0, refreshCadenceSeconds - elapsedSeconds)
+  })()
 
   return (
     <section className="panel suggestions-panel">
