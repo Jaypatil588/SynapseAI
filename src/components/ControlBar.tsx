@@ -1,5 +1,3 @@
-import { formatTime } from '../lib/utils'
-
 type ControlBarProps = {
   isRecording: boolean
   isBusy: boolean
@@ -21,11 +19,6 @@ type ControlBarProps = {
 export function ControlBar({
   isRecording,
   isBusy,
-  transcriptCount,
-  suggestionBatchCount,
-  lastSuggestionLatencyMs,
-  lastChatLatencyMs,
-  lastRefreshAt,
   isLargeModel,
   transcribeLanguage,
   onToggleLargeModel,
@@ -65,17 +58,6 @@ export function ControlBar({
         </button>
         <button onClick={onExport}>Export Session</button>
         <button onClick={onOpenSettings}>Groq Key Settings</button>
-      </div>
-
-      <div className="control-bar__meta">
-        <span>Transcript: {transcriptCount}</span>
-        <span>Batches: {suggestionBatchCount}</span>
-        <span>
-          Suggestion Latency:{' '}
-          {lastSuggestionLatencyMs !== null ? `${lastSuggestionLatencyMs}ms` : '--'}
-        </span>
-        <span>Chat Latency: {lastChatLatencyMs !== null ? `${lastChatLatencyMs}ms` : '--'}</span>
-        <span>Last Refresh: {lastRefreshAt ? formatTime(lastRefreshAt) : '--'}</span>
       </div>
     </header>
   )

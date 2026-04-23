@@ -32,7 +32,7 @@
   /* Typography Scale */
   --fs-xs: 0.75rem;     /* 12px */
   --fs-sm: 0.875rem;    /* 14px */
-  --fs-base: 1rem;      /* 16px */
+  --fs-base: 0.875rem;  /* 14px */
   --fs-lg: 1.125rem;    /* 18px */
   --fs-xl: 1.25rem;     /* 20px */
   --fs-2xl: 1.5rem;     /* 24px */
@@ -1337,5 +1337,21 @@ button, input, textarea { font: inherit; }
   background-color: rgba(255, 240, 0, 0.15) !important;
   color: #FFF000 !important;
   border: 1px solid rgba(255, 240, 0, 0.3) !important;
+}
+
+/* Global typography override: make all text 1rem */
+:where(
+  html,
+  body,
+  h1, h2, h3, h4, h5, h6,
+  p, span, a, li,
+  strong, em, small, code, pre,
+  label,
+  button, input, textarea, select, option,
+  th, td,
+  summary, details,
+  figcaption, caption
+) {
+  font-size: 1rem !important;
 }
 
