@@ -49,7 +49,6 @@ function App() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
   const [isGeneratingChat, setIsGeneratingChat] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
   const [suggestionBatches, setSuggestionBatches] = useState<SuggestionBatch[]>([])
@@ -225,10 +224,7 @@ function App() {
   }, [sessionId, isRecording, userContext]);
 
   async function toggleRecording() {
-    setErrorMessage(null)
-
     if (!apiKeyRef.current.trim()) {
-      setErrorMessage('Add your Groq API key in Settings before recording.')
       setIsSettingsOpen(true)
       return
     }
@@ -252,7 +248,8 @@ function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       if (stream.getAudioTracks().length === 0) {
         stream.getTracks().forEach((track) => track.stop())
-        setErrorMessage('No microphone audio track captured.')
+        console.warn('No microphone audio track captured.')
+        setIsRecording(false)
         return
       }
 
@@ -325,7 +322,7 @@ function App() {
       setIsRecording(true)
       setActiveView('session')
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Could not access microphone.'))
+      console.error('Microphone access failed:', error)
       stopRecordingStream()
       setIsRecording(false)
     }
@@ -408,9 +405,7 @@ function App() {
             return next
           })
         } catch (error) {
-          setErrorMessage(
-            `${getErrorMessage(error, 'Transcription failed.')} (chunk mime: ${chunk.type || 'unknown'}, bytes: ${chunk.size})`,
-          )
+          console.error('Transcription chunk failed:', error, chunk.type, chunk.size)
         }
       }
     } finally {
@@ -427,7 +422,6 @@ function App() {
 
     const trimmedKey = apiKeyRef.current.trim()
     if (!trimmedKey) {
-      setErrorMessage('Add your Groq API key in Settings to refresh suggestions.')
       return
     }
 
@@ -499,7 +493,7 @@ function App() {
       setLastRefreshAt(nowIso())
       pendingManualRefreshRef.current = false
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Suggestion refresh failed.'))
+      console.error('Suggestion refresh failed:', error)
     } finally {
       isGeneratingSuggestionsRef.current = false
       setIsGeneratingSuggestions(false)
@@ -507,7 +501,6 @@ function App() {
   }
 
   async function handleManualRefresh() {
-    setErrorMessage(null)
 
     const recorder = mediaRecorderRef.current
     if (isRecording && recorder && recorder.state === 'recording') {
@@ -611,7 +604,7 @@ function App() {
   async function generateAssistantChat(prompt: string) {
     const trimmedKey = apiKeyRef.current.trim()
     if (!trimmedKey) {
-      setErrorMessage('Add your Groq API key in Settings to use chat.')
+      setIsSettingsOpen(true)
       return
     }
 
@@ -655,7 +648,7 @@ function App() {
 
       setLastChatLatencyMs(Math.round(performance.now() - startedAt))
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Chat generation failed.'))
+      console.error('Chat generation failed:', error)
     } finally {
       setIsGeneratingChat(false)
     }
@@ -772,13 +765,7 @@ function App() {
   )
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
-  return fallback
-}
+export default App
 
 function normalizeChunkText(chunkText: string, transcript: TranscriptEntry[]): string {
   const normalized = chunkText.trim().replace(/\s+/g, ' ')
