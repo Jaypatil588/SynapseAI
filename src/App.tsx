@@ -6,6 +6,8 @@ import { HistorySidebar } from './components/HistorySidebar'
 import { SettingsModal } from './components/SettingsModal'
 import { SuggestionsPanel } from './components/SuggestionsPanel'
 import { TranscriptPanel } from './components/TranscriptPanel'
+import { Dashboard } from './components/Dashboard'
+import { TopNav } from './components/TopNav'
 import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY } from './lib/defaults'
 import { groqChatCompletion, groqStreamChatCompletion, groqTranscribeAudio } from './lib/groq'
 import {
@@ -62,6 +64,9 @@ function App() {
 
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [userContext, setUserContext] = useState('')
+  
+  // View state: 'dashboard' or 'session'
+  const [activeView, setActiveView] = useState<'dashboard' | 'session'>('dashboard')
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -281,6 +286,8 @@ function App() {
       }, intervalMs);
 
       setIsRecording(true)
+      // Switch to session view when recording starts
+      setActiveView('session')
     } catch (error) {
       setErrorMessage(getErrorMessage(error, 'Could not access microphone capture.'))
       stopRecordingStream()
@@ -623,7 +630,7 @@ function App() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `twinmind-session-${Date.now()}.json`
+    anchor.download = `synapseai-session-${Date.now()}.json`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -643,6 +650,24 @@ function App() {
     setTranscript(session.transcript)
     setSuggestionBatches([])
     setChatHistory([])
+    setActiveView('session')
+  }
+
+  function handleNewChat() {
+    if (isRecording) {
+      setErrorMessage("Please stop recording before starting a new chat.")
+      return;
+    }
+    setSessionId(null)
+    setUserContext('')
+    setTranscript([])
+    setSuggestionBatches([])
+    setChatHistory([])
+    setActiveView('dashboard')
+  }
+
+  function handleStartSession() {
+    setActiveView('session')
   }
 
   return (
@@ -651,72 +676,88 @@ function App() {
         databaseUrl={settings.databaseUrl}
         currentSessionId={sessionId}
         onSelectSession={loadPastSessionFromDB}
+        onNewChat={handleNewChat}
+        activeView={activeView}
       />
       <div className="app-shell">
-        <ControlBar
-          isRecording={isRecording}
-          isBusy={isBusy}
-          transcriptCount={transcript.length}
-          suggestionBatchCount={suggestionBatches.length}
-          lastSuggestionLatencyMs={lastSuggestionLatencyMs}
-          lastChatLatencyMs={lastChatLatencyMs}
-          lastRefreshAt={lastRefreshAt}
-          isFastTranscribeMode={isFastTranscribeMode}
-          isLargeModel={isLargeModel}
-          onToggleFastTranscribeMode={toggleFastTranscribeMode}
-          onToggleLargeModel={toggleLargeModel}
-          onToggleRecording={toggleRecording}
-          onManualRefresh={handleManualRefresh}
-          onExport={exportSession}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+        <TopNav 
+          activeTab={activeView} 
+          onOpenSettings={() => setIsSettingsOpen(true)} 
         />
+        
+        {activeView === 'dashboard' ? (
+          <Dashboard 
+            onStartSession={handleStartSession}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        ) : (
+          <div className="session-view">
+            <ControlBar
+              isRecording={isRecording}
+              isBusy={isBusy}
+              transcriptCount={transcript.length}
+              suggestionBatchCount={suggestionBatches.length}
+              lastSuggestionLatencyMs={lastSuggestionLatencyMs}
+              lastChatLatencyMs={lastChatLatencyMs}
+              lastRefreshAt={lastRefreshAt}
+              isFastTranscribeMode={isFastTranscribeMode}
+              isLargeModel={isLargeModel}
+              onToggleFastTranscribeMode={toggleFastTranscribeMode}
+              onToggleLargeModel={toggleLargeModel}
+              onToggleRecording={toggleRecording}
+              onManualRefresh={handleManualRefresh}
+              onExport={exportSession}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
 
-        {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+            {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
 
-        {!hasSessionData ? (
-          <div className="hint-banner">
-            Start microphone recording. {isFastTranscribeMode ? 'Fast mode uses 3s chunks with overlap.' : 'Slow mode uses 30s chunks.'} Suggestions refresh every ~{suggestionCadenceSeconds}s.
+            {!hasSessionData ? (
+              <div className="hint-banner">
+                Start microphone recording. {isFastTranscribeMode ? 'Fast mode uses 3s chunks with overlap.' : 'Slow mode uses 30s chunks.'} Suggestions refresh every ~{suggestionCadenceSeconds}s.
+              </div>
+            ) : null}
+
+            <main className="three-column-layout">
+              <TranscriptPanel
+                entries={transcript}
+                isRecording={isRecording}
+                isTranscribing={isTranscribing}
+                userContext={userContext}
+                onUserContextChange={setUserContext}
+                slidingWindowContext={useMemo(() => {
+                  const fiveMinsAgo = Date.now() - 300_000
+                  const recent = transcript.filter(t => new Date(t.timestamp).getTime() > fiveMinsAgo)
+                  return transcriptToContext(recent, recent.length)
+                }, [transcript])}
+              />
+
+              <SuggestionsPanel
+                batches={suggestionBatches}
+                isLoading={isGeneratingSuggestions}
+                isRecording={isRecording}
+                lastRefreshAt={lastRefreshAt}
+                refreshCadenceSeconds={suggestionCadenceSeconds}
+                onSelectSuggestion={(item) => {
+                  void answerFromSuggestion(item)
+                }}
+              />
+
+              <ChatPanel
+                messages={chatHistory}
+                isLoading={isGeneratingChat}
+                suggestionCadenceSeconds={suggestionCadenceSeconds}
+                onSubmitQuestion={submitChatQuestion}
+              />
+            </main>
+
+            <ApiTestLab
+              apiKey={apiKey}
+              chatModel={settings.generationModel}
+              transcriptionModel={settings.transcriptionModel}
+            />
           </div>
-        ) : null}
-
-        <main className="three-column-layout">
-          <TranscriptPanel
-            entries={transcript}
-            isRecording={isRecording}
-            isTranscribing={isTranscribing}
-            userContext={userContext}
-            onUserContextChange={setUserContext}
-            slidingWindowContext={useMemo(() => {
-              const fiveMinsAgo = Date.now() - 300_000
-              const recent = transcript.filter(t => new Date(t.timestamp).getTime() > fiveMinsAgo)
-              return transcriptToContext(recent, recent.length)
-            }, [transcript])}
-          />
-
-          <SuggestionsPanel
-            batches={suggestionBatches}
-            isLoading={isGeneratingSuggestions}
-            isRecording={isRecording}
-            lastRefreshAt={lastRefreshAt}
-            refreshCadenceSeconds={suggestionCadenceSeconds}
-            onSelectSuggestion={(item) => {
-              void answerFromSuggestion(item)
-            }}
-          />
-
-          <ChatPanel
-            messages={chatHistory}
-            isLoading={isGeneratingChat}
-            suggestionCadenceSeconds={suggestionCadenceSeconds}
-            onSubmitQuestion={submitChatQuestion}
-          />
-        </main>
-
-        <ApiTestLab
-          apiKey={apiKey}
-          chatModel={settings.generationModel}
-          transcriptionModel={settings.transcriptionModel}
-        />
+        )}
 
         <SettingsModal
           isOpen={isSettingsOpen}
