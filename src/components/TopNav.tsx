@@ -1,9 +1,6 @@
-type TopNavProps = {
-  activeTab: 'dashboard' | 'session';
-  onOpenSettings: () => void;
-};
 
-export function TopNav({ activeTab, onOpenSettings }: TopNavProps) {
+
+export function TopNav() {
   return (
     <nav className="top-nav" style={{ justifyContent: 'space-between' }}>
       <div className="top-nav__links">

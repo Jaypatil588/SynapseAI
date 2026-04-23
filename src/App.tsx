@@ -3,7 +3,6 @@ import hark from 'hark'
 import { ChatPanel } from './components/ChatPanel'
 import { ControlBar } from './components/ControlBar'
 import { ApiTestLab } from './components/ApiTestLab'
-import { HistorySidebar } from './components/HistorySidebar'
 import { SettingsModal } from './components/SettingsModal'
 import { SuggestionsPanel } from './components/SuggestionsPanel'
 import { TranscriptPanel } from './components/TranscriptPanel'
@@ -19,7 +18,7 @@ import {
   transcriptToContextBounded,
   uid,
 } from './lib/utils'
-import { initializeDatabase, saveSessionState, type DBSession } from './lib/db'
+import { initializeDatabase, saveSessionState } from './lib/db'
 import type {
   AppSettings,
   ChatMessage,
@@ -667,32 +666,6 @@ function App() {
     [transcript.length, suggestionBatches.length, chatHistory.length],
   )
 
-  function loadPastSessionFromDB(session: DBSession) {
-    if (isRecording) {
-      setErrorMessage("Please stop recording before loading a past session.")
-      return;
-    }
-    setSessionId(session.id)
-    setUserContext(session.user_context || '')
-    setTranscript(session.transcript)
-    setSuggestionBatches([])
-    setChatHistory([])
-    setActiveView('session')
-  }
-
-  function handleNewChat() {
-    if (isRecording) {
-      setErrorMessage("Please stop recording before starting a new chat.")
-      return;
-    }
-    setSessionId(null)
-    setUserContext('')
-    setTranscript([])
-    setSuggestionBatches([])
-    setChatHistory([])
-    setActiveView('dashboard')
-  }
-
   function handleStartSession() {
     setActiveView('session')
   }
@@ -701,10 +674,7 @@ function App() {
     <div className="app-container">
 
       <div className="app-shell">
-        <TopNav 
-          activeTab={activeView} 
-          onOpenSettings={() => setIsSettingsOpen(true)} 
-        />
+        <TopNav />
         
         {activeView === 'dashboard' ? (
           <Dashboard 
@@ -835,17 +805,6 @@ function tokenize(value: string): string[] {
     .split(/\s+/)
     .map((word) => word.trim())
     .filter(Boolean)
-}
-
-function pickSupportedRecorderMimeType(): string | undefined {
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
-
-  const supported = candidates.find((type) => MediaRecorder.isTypeSupported(type))
-  return supported
-}
-
-function isOverlapSafeMimeType(mimeType: string): boolean {
-  return mimeType.includes('webm') || mimeType.includes('ogg')
 }
 
 export default App
