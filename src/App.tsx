@@ -7,7 +7,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { SuggestionsPanel } from './components/SuggestionsPanel'
 import { TranscriptPanel } from './components/TranscriptPanel'
 import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY } from './lib/defaults'
-import { groqChatCompletion, groqStreamChatCompletion, groqCheckComplexity, groqTranscribeAudio } from './lib/groq'
+import { groqChatCompletion, groqStreamChatCompletion, groqTranscribeAudio } from './lib/groq'
 import {
   fallbackSuggestions,
   nowIso,
@@ -27,10 +27,6 @@ import type {
 } from './types'
 import './index.css'
 
-const FAST_SLICE_MS = 500
-const FAST_CHUNK_SLICES = 14 // 7s window
-const FAST_STRIDE_SLICES = 12 // 6s stride = 10 req/min
-const SLOW_CHUNK_MS = 30_000
 
 function App() {
   const envApiKey = (import.meta.env.VITE_GROQ_API_KEY as string | undefined)?.trim() ?? ''
@@ -427,16 +423,16 @@ function App() {
         temperature: 0.6,
       });
 
-      const suggestions = parseSuggestionResponse(rawSuggestions).slice(0, 3)
-      if (suggestions.length < 3) {
+      let mergedSuggestions = parseSuggestionResponse(rawSuggestions).slice(0, 3)
+      if (mergedSuggestions.length < 3) {
         const fallback = fallbackSuggestions(currentTranscript)
-        suggestions = [...suggestions, ...fallback].slice(0, 3)
+        mergedSuggestions = [...mergedSuggestions, ...fallback].slice(0, 3)
       }
 
       const batch: SuggestionBatch = {
         id: uid('batch'),
         timestamp: nowIso(),
-        items: suggestions,
+        items: mergedSuggestions,
       }
 
       setSuggestionBatches((previous) => [batch, ...previous])
