@@ -30,8 +30,7 @@ import './index.css'
 
 
 function App() {
-  const envApiKey = (import.meta.env.VITE_GROQ_API_KEY as string | undefined)?.trim() ?? ''
-  const [apiKey, setApiKey] = useState(envApiKey)
+  const [apiKey, setApiKey] = useState('')
   const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = localStorage.getItem(SETTINGS_STORAGE_KEY)
     if (!stored) return DEFAULT_SETTINGS
@@ -43,9 +42,10 @@ function App() {
     }
   })
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(!envApiKey)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const isLargeModel = settings.generationModel === 'openai/gpt-oss-120b'
+  const [isLargeModel, setIsLargeModel] = useState(settings.generationModel === 'openai/gpt-oss-120b')
+  const [transcribeLanguage, setTranscribeLanguage] = useState<'en' | 'auto'>('en')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
   const [isGeneratingChat, setIsGeneratingChat] = useState(false)
@@ -77,6 +77,7 @@ function App() {
 
   const apiKeyRef = useRef(apiKey)
   const settingsRef = useRef(settings)
+  const transcribeLanguageRef = useRef(transcribeLanguage)
   const transcriptRef = useRef<TranscriptEntry[]>(transcript)
   const userContextRef = useRef('')
   const isGeneratingSuggestionsRef = useRef(false)
@@ -105,6 +106,10 @@ function App() {
   useEffect(() => {
     settingsRef.current = settings
   }, [settings])
+
+  useEffect(() => {
+    transcribeLanguageRef.current = transcribeLanguage
+  }, [transcribeLanguage])
 
   useEffect(() => {
     transcriptRef.current = transcript
@@ -185,7 +190,28 @@ function App() {
       const latestNewEntryId = newEntriesForSummary[newEntriesForSummary.length - 1].id;
       const newText = newEntriesForSummary.map(e => e.text).join('\n');
 
-      const systemPrompt = settingsRef.current.gapSummaryPrompt;
+      const systemPrompt = `You are a precision transcript archivist. Your job is to create and maintain a dense, factual running summary of meeting transcript content that has overflowed the active context window. This summary will be injected into future LLM context to compensate for lost history — accuracy is critical.
+
+PRESERVE — extract and keep ALL of the following:
+- Named entities: people (full names + roles if mentioned), companies, products, systems, tools
+- Concrete numbers: dates, deadlines, timelines, budgets, metrics, version numbers
+- Explicit decisions: "we decided", "agreed to", "confirmed that", "rejected", "approved"
+- Action items and owners: who committed to do what and by when
+- Key topics discussed and their resolution status (resolved / unresolved / deferred)
+- Important claims, assertions, or positions taken by any party
+
+DISCARD — do NOT include:
+- Small talk, pleasantries, filler phrases
+- Repetition or restatements of the same point
+- Pure hypotheticals unless explicitly agreed upon
+- Transitional phrases and meta-commentary
+
+FORMAT RULES:
+- Write in telegraphic, dense style — omit articles and filler where meaning is preserved
+- Group related items under topic clusters
+- Max 400 words total
+- Never write "the transcript says" — just state the facts directly
+- If updating an existing summary, integrate new content chronologically without duplicating`;
       const userPrompt = gapSummaryRef.current
         ? `EXISTING RUNNING SUMMARY:\n<summary>\n${gapSummaryRef.current}\n</summary>\n\nNEW TRANSCRIPT LINES TO INTEGRATE:\n<new_lines>\n${newText}\n</new_lines>\n\nUpdate the summary by integrating these new lines chronologically. Do not duplicate existing content.`
         : `Summarize these transcript lines into a dense factual archive:\n<new_lines>\n${newText}\n</new_lines>`;
@@ -230,9 +256,6 @@ function App() {
     }
 
     if (isRecording) {
-      if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
-        sliceIsValidRef.current = true;
-      }
       stopRecordingStream()
       setIsRecording(false)
       return
@@ -255,34 +278,9 @@ function App() {
 
       mediaStreamRef.current = stream
 
-      // Initialize native Web Audio analyzer for volume filtering
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-      const source = audioContext.createMediaStreamSource(stream)
-      const analyzer = audioContext.createAnalyser()
-      analyzer.fftSize = 256
-      source.connect(analyzer)
-      
-      const dataArray = new Uint8Array(analyzer.frequencyBinCount)
-
-      // Poll volume periodically. If it exceeds a static threshold (e.g. 15 on a 0-255 scale), flag the chunk.
-      volumeIntervalRef.current = window.setInterval(() => {
-        analyzer.getByteFrequencyData(dataArray)
-        let sum = 0
-        for (let i = 0; i < dataArray.length; i++) { sum += dataArray[i] }
-        const average = sum / dataArray.length
-        
-        if (average > 15) {
-          hasSpokenInChunkRef.current = true
-        }
-      }, 100)
-
       const handleDataAvailable = (event: BlobEvent) => {
-        if (!event.data || event.data.size < 4000) return // Increase to 4KB to avoid header-only/empty chunks
-        if (sliceIsValidRef.current) {
-          enqueueTranscriptionChunk(event.data)
-          sliceIsValidRef.current = false
-        }
+        if (!event.data || event.data.size < 1000) return 
+        enqueueTranscriptionChunk(event.data)
       }
 
       const options = { mimeType: 'audio/webm' }
@@ -291,13 +289,6 @@ function App() {
       mediaRecorder.ondataavailable = handleDataAvailable
 
       const sliceAndResetChunk = () => {
-        // Did volume spike in the last 6s?
-        if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
-          sliceIsValidRef.current = true
-        } else {
-          sliceIsValidRef.current = false
-        }
-
         if (mediaRecorderRef.current?.state === 'recording') {
           mediaRecorderRef.current.stop()
         }
@@ -309,12 +300,10 @@ function App() {
           newRecorder.start()
           mediaRecorderRef.current = newRecorder
         }
-
-        hasSpokenInChunkRef.current = false
       }
 
-      // Fixed 6-second hardware interval
-      chunkIntervalRef.current = window.setInterval(sliceAndResetChunk, 6000)
+      // Fixed 10-second hardware interval
+      chunkIntervalRef.current = window.setInterval(sliceAndResetChunk, 10000)
 
 
 
@@ -387,7 +376,7 @@ function App() {
             apiKey: trimmedKey,
             model: settingsRef.current.transcriptionModel,
             audio: chunk,
-            prompt: settingsRef.current.transcriptionPrompt || undefined,
+            language: transcribeLanguageRef.current,
           })
 
           const normalizedText = normalizeChunkText(text, transcriptRef.current)
@@ -455,7 +444,50 @@ function App() {
         .map(i => i.preview)
         .join(' | ');
 
-      let extendedSystemPrompt = settingsRef.current.liveSuggestionPrompt;
+      let extendedSystemPrompt = `You are SynapseAI — a real-time meeting intelligence layer. Analyze the transcript and generate exactly ONE suggestion per type (5 total), plus a typeRanking that reflects which types are most relevant to the current conversational moment.
+
+ANALYSIS RULES:
+- Focus on the MOST RECENT 60–120 seconds of transcript, not the full history
+- A great suggestion is triggered by something SPECIFIC that was just said — name it
+- Prioritize unresolved threads, implicit assumptions, unchallenged claims, and missed follow-ups
+- Generic advice ("ask for clarification") is a failure — be surgical and concrete
+
+SUGGESTION TYPES — generate exactly one of each:
+- question_to_ask: The single best question the user should pose to the other party RIGHT NOW
+- talking_point: A specific fact, counterpoint, or angle worth introducing into the conversation
+- answer: A direct response to something that was asked or left hanging in the transcript
+- fact_check: A specific claim worth verifying — name the claim and source of doubt
+- clarification: The most critical ambiguity that is blocking progress if left undefined
+
+TYPE RANKING — rank all 5 types by relevance to THIS specific conversational moment:
+- Consider user intent (what is the user trying to achieve?), meeting phase, and what just happened
+- Rank 1 = most relevant right now, Rank 5 = least relevant right now
+- Base ranking on: current topic complexity, volume of unresolved questions, claim density, and ambiguity level
+
+OUTPUT RULES:
+- Return ONLY valid JSON — no markdown fences, no explanation, no preamble
+- Exactly 5 suggestion objects, one per type
+- preview: max 140 chars — self-contained, usable word-for-word without reading the transcript
+- whyNow: max 100 chars — reference the specific conversational trigger (a word, phrase, or moment)
+- rank in suggestions must match typeRanking values
+
+SCHEMA (strict):
+{
+  "typeRanking": {
+    "question_to_ask": <1-5>,
+    "talking_point": <1-5>,
+    "answer": <1-5>,
+    "fact_check": <1-5>,
+    "clarification": <1-5>
+  },
+  "suggestions": [
+    {"type": "question_to_ask", "preview": "...", "whyNow": "...", "rank": <1-5>},
+    {"type": "talking_point", "preview": "...", "whyNow": "...", "rank": <1-5>},
+    {"type": "answer", "preview": "...", "whyNow": "...", "rank": <1-5>},
+    {"type": "fact_check", "preview": "...", "whyNow": "...", "rank": <1-5>},
+    {"type": "clarification", "preview": "...", "whyNow": "...", "rank": <1-5>}
+  ]
+}`;
       if (userContextRef.current) {
         extendedSystemPrompt += `\n\nUSER DIRECTIVE (Prioritize this): ${userContextRef.current}`;
       }
@@ -522,12 +554,17 @@ function App() {
 
 
   function toggleLargeModel() {
+    setIsLargeModel(prev => !prev)
     setSettings((prev) => ({
       ...prev,
-      generationModel: prev.generationModel === 'openai/gpt-oss-120b'
-        ? 'openai/gpt-oss-20b'
-        : 'openai/gpt-oss-120b'
+      generationModel: !isLargeModel
+        ? 'openai/gpt-oss-120b'
+        : 'openai/gpt-oss-20b'
     }))
+  }
+
+  function toggleLanguage() {
+    setTranscribeLanguage(prev => prev === 'en' ? 'auto' : 'en')
   }
 
   async function answerFromSuggestion(suggestion: SuggestionItem) {
@@ -550,17 +587,26 @@ function App() {
       ? `${head}\n\n[... ${omittedEntries.length} entries omitted ...]\n[Summary of omitted section: ${gapSummaryRef.current || 'Pending...'}]\n\n${tail}`
       : head;
     const prompt = [
-      'The user clicked this live suggestion:',
       `${suggestion.preview}`,
       '',
-      `Suggestion type: ${suggestion.type}`,
-      `Why now: ${suggestion.whyNow}`,
-      '',
-      'Transcript context:',
+      `Transcript:`,
       transcriptContext,
+      '',
+      `Again, answer the following question: ${suggestion.preview}`,
     ].join('\n')
 
-    await generateAssistantChat(prompt)
+    const systemPrompt = `You are SynapseAI, a world-class research assistant and trusted second brain. Your objective is to help the user deeply understand the topic they selected.
+
+Format your response exactly into these two sections:
+
+### From the transcript
+Provide a direct answer based exclusively on the provided meeting transcript. Cite specific lines where possible. If the transcript does not contain the answer, state that.
+
+### More details
+Use your internet search capabilities to generate a thorough, detailed, and expansive response that supplements the transcript context with real-world knowledge.`;
+
+    const effort = (suggestion.type === 'fact_check' || suggestion.type === 'answer') ? 'high' : 'medium'
+    await generateAssistantChat(prompt, systemPrompt, effort)
   }
 
   async function submitChatQuestion(question: string) {
@@ -598,10 +644,20 @@ function App() {
       recentMessages || 'No chat yet.',
     ].join('\n')
 
-    await generateAssistantChat(prompt)
+    const systemPrompt = `You are SynapseAI, a world-class research assistant and trusted second brain. Your objective is to answer the user's free-form chat query.
+
+Format your response exactly into these two sections:
+
+### From the transcript
+Provide a direct answer based exclusively on the provided meeting transcript. Cite specific lines where possible. If the transcript does not contain the answer, state that.
+
+### More details
+Use your internet search capabilities to generate a thorough, detailed, and expansive response that supplements the transcript context with real-world knowledge.`;
+
+    await generateAssistantChat(prompt, systemPrompt, 'high')
   }
 
-  async function generateAssistantChat(prompt: string) {
+  async function generateAssistantChat(prompt: string, systemPrompt: string, reasoningEffort: 'low' | 'medium' | 'high' = 'low') {
     const trimmedKey = apiKeyRef.current.trim()
     if (!trimmedKey) {
       setIsSettingsOpen(true)
@@ -629,10 +685,10 @@ function App() {
       const stream = await groqStreamChatCompletion({
         apiKey: trimmedKey,
         model: settingsRef.current.generationModel,
-        systemPrompt: settingsRef.current.chatPrompt,
+        systemPrompt: systemPrompt,
         userPrompt: prompt,
         temperature: 0.8,
-        isHighComplexity: false
+        reasoningEffort,
       });
 
       for await (const chunk of stream) {
@@ -655,21 +711,66 @@ function App() {
   }
 
   function exportSession() {
-    const payload: ExportPayload = {
-      exportedAt: nowIso(),
-      transcript,
-      suggestionBatches,
-      chatHistory,
+    const lines: string[] = []
+
+    lines.push(`SYNAPSEAI SESSION EXPORT`)
+    lines.push(`Exported At: ${new Date().toLocaleString()}`)
+    lines.push(``)
+    lines.push(`=========================================`)
+    lines.push(``)
+
+    lines.push(`TRANSCRIPT`)
+    lines.push(``)
+    if (transcript.length === 0) {
+      lines.push(`No transcript recorded.`)
+    } else {
+      for (const entry of transcript) {
+        const time = new Date(entry.timestamp).toLocaleTimeString()
+        lines.push(`[${time}] ${entry.text}`)
+      }
+    }
+    lines.push(``)
+    lines.push(`=========================================`)
+    lines.push(``)
+
+    lines.push(`LIVE SUGGESTIONS`)
+    lines.push(``)
+    if (suggestionBatches.length === 0) {
+      lines.push(`No suggestions generated.`)
+    } else {
+      // Print in chronological order (batches are stored newest first)
+      const sortedBatches = [...suggestionBatches].reverse()
+      for (const batch of sortedBatches) {
+        const time = new Date(batch.timestamp).toLocaleTimeString()
+        lines.push(`--- Batch ${batch.batchNumber} (${time}) ---`)
+        for (const item of batch.items) {
+          lines.push(`[${item.type.toUpperCase()}] ${item.preview}`)
+        }
+        lines.push(``)
+      }
+    }
+    lines.push(`=========================================`)
+    lines.push(``)
+
+    lines.push(`CHAT HISTORY`)
+    lines.push(``)
+    if (chatHistory.length === 0) {
+      lines.push(`No chat history.`)
+    } else {
+      for (const msg of chatHistory) {
+        const time = new Date(msg.timestamp).toLocaleTimeString()
+        lines.push(`${msg.role === 'user' ? 'USER' : 'ASSISTANT'} [${time}]:`)
+        lines.push(msg.content)
+        lines.push(``)
+      }
     }
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    })
-
+    const textPayload = lines.join('\n')
+    const blob = new Blob([textPayload], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `synapseai-session-${Date.now()}.json`
+    anchor.download = `synapseai-session-${Date.now()}.txt`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -700,7 +801,9 @@ function App() {
               lastChatLatencyMs={lastChatLatencyMs}
               lastRefreshAt={lastRefreshAt}
               isLargeModel={isLargeModel}
+              transcribeLanguage={transcribeLanguage}
               onToggleLargeModel={toggleLargeModel}
+              onToggleLanguage={toggleLanguage}
               onToggleRecording={toggleRecording}
               onManualRefresh={handleManualRefresh}
               onExport={exportSession}
@@ -755,9 +858,7 @@ function App() {
         <SettingsModal
           isOpen={isSettingsOpen}
           apiKey={apiKey}
-          settings={settings}
           onApiKeyChange={setApiKey}
-          onSettingsChange={setSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
       </div>

@@ -68,11 +68,9 @@ export async function groqStreamChatCompletion({
   systemPrompt,
   userPrompt,
   temperature = 0.2,
-  isHighComplexity = false
-}: ChatOptions & { isHighComplexity?: boolean }) {
+  reasoningEffort = 'low',
+}: ChatOptions & { reasoningEffort?: 'low' | 'medium' | 'high' }) {
   const client = new Groq({ apiKey, dangerouslyAllowBrowser: true })
-  
-  const tools = isHighComplexity ? [{ type: 'browser_search' as const }] : undefined;
   
   return await client.chat.completions.create({
     model,
@@ -81,12 +79,11 @@ export async function groqStreamChatCompletion({
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    max_completion_tokens: isHighComplexity ? 8192 : 2048,
+    max_completion_tokens: 2048,
     top_p: 1,
-    reasoning_effort: isHighComplexity ? 'high' : 'low',
+    reasoning_effort: reasoningEffort,
     stream: true,
     stop: null,
-    tools: tools as any
   })
 }
 
@@ -95,18 +92,23 @@ export async function groqTranscribeAudio({
   model,
   audio,
   prompt,
+  language = 'en',
 }: {
   apiKey: string
   model: string
   audio: Blob
   prompt?: string
+  language?: 'en' | 'auto'
 }): Promise<string> {
-  console.log(`[groqTranscribeAudio] Starting transcription. Model: ${model}, Audio Blob Size: ${audio.size}, Audio Blob Type: ${audio.type || 'unknown'}`);
+  console.log(`[groqTranscribeAudio] Starting transcription. Model: ${model}, Language: ${language}, Audio Blob Size: ${audio.size}, Audio Blob Type: ${audio.type || 'unknown'}`);
   
   const formData = new FormData()
   formData.append('model', model)
-  formData.append('temperature', '0.9')
-  formData.append('response_format', 'verbose_json')
+  formData.append('temperature', '0.0')
+  formData.append('response_format', 'json')
+  if (language === 'en') {
+    formData.append('language', 'en')
+  }
   if (prompt) {
     formData.append('prompt', prompt)
   }

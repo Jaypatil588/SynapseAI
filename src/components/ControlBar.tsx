@@ -9,7 +9,9 @@ type ControlBarProps = {
   lastChatLatencyMs: number | null
   lastRefreshAt: string | null
   isLargeModel: boolean
+  transcribeLanguage: 'en' | 'auto'
   onToggleLargeModel: () => void
+  onToggleLanguage: () => void
   onToggleRecording: () => void
   onManualRefresh: () => void
   onExport: () => void
@@ -25,7 +27,9 @@ export function ControlBar({
   lastChatLatencyMs,
   lastRefreshAt,
   isLargeModel,
+  transcribeLanguage,
   onToggleLargeModel,
+  onToggleLanguage,
   onToggleRecording,
   onManualRefresh,
   onExport,
@@ -49,11 +53,18 @@ export function ControlBar({
         >
           {isLargeModel ? '120b ⚡' : '20b'}
         </button>
+        <button
+          onClick={onToggleLanguage}
+          title={transcribeLanguage === 'en' ? 'Enforcing English transcription (click for auto-detect)' : 'Auto-detecting language (click to enforce English)'}
+          style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
+        >
+          {transcribeLanguage === 'en' ? 'EN' : 'AUTO'}
+        </button>
         <button onClick={onManualRefresh} disabled={isBusy}>
           Refresh Now
         </button>
         <button onClick={onExport}>Export Session</button>
-        <button onClick={onOpenSettings}>Settings</button>
+        <button onClick={onOpenSettings}>Groq Key Settings</button>
       </div>
 
       <div className="control-bar__meta">

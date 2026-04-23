@@ -46,10 +46,6 @@ export type AppSettings = {
   liveSuggestionContextEntries: number
   expandedAnswerContextEntries: number
   chatContextEntries: number
-  transcriptionPrompt: string
-  liveSuggestionPrompt: string
-  chatPrompt: string
-  gapSummaryPrompt: string
   databaseUrl: string
 }
 
