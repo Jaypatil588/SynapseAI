@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import hark from 'hark'
 import { ChatPanel } from './components/ChatPanel'
 import { ControlBar } from './components/ControlBar'
 import { ApiTestLab } from './components/ApiTestLab'
@@ -46,7 +47,6 @@ function App() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(!envApiKey)
   const [isRecording, setIsRecording] = useState(false)
-  const [isFastTranscribeMode, setIsFastTranscribeMode] = useState(false)
   const isLargeModel = settings.generationModel === 'openai/gpt-oss-120b'
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
@@ -66,12 +66,17 @@ function App() {
   const [userContext, setUserContext] = useState('')
   
   // View state: 'dashboard' or 'session'
-  const [activeView, setActiveView] = useState<'dashboard' | 'session'>('dashboard')
+  const [activeView, setActiveView] = useState<'dashboard' | 'session'>('session')
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const harkRef = useRef<hark.Harker | null>(null)
+  const silenceTimeoutRef = useRef<number | undefined>(undefined)
+  const hasSpokenInChunkRef = useRef(false)
+  const sliceIsValidRef = useRef(false)
+  const maxChunkTimeoutRef = useRef<number | undefined>(undefined)
+  
   const pendingManualRefreshRef = useRef(false)
-  const recordingIntervalRef = useRef<number | undefined>(undefined)
 
   const apiKeyRef = useRef(apiKey)
   const settingsRef = useRef(settings)
@@ -88,6 +93,8 @@ function App() {
 
   const transcriptionQueueRef = useRef<Blob[]>([])
   const isProcessingTranscriptionQueueRef = useRef(false)
+
+
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -127,7 +134,7 @@ function App() {
     }
   }, [])
 
-  const suggestionCadenceSeconds = isFastTranscribeMode ? 10 : 30
+  const suggestionCadenceSeconds = 30
   const isBusy = isTranscribing || isGeneratingSuggestions || isGeneratingChat
 
   // Reactive Event Pipeline
@@ -228,6 +235,9 @@ function App() {
     }
 
     if (isRecording) {
+      if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
+        sliceIsValidRef.current = true;
+      }
       stopRecordingStream()
       setIsRecording(false)
       return
@@ -243,66 +253,85 @@ function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       if (stream.getAudioTracks().length === 0) {
         stream.getTracks().forEach((track) => track.stop())
-        setErrorMessage(
-          'No microphone audio track captured. Please check your microphone permissions.',
-        )
-        return
-      }
-      const recordingStream = new MediaStream(stream.getAudioTracks())
-      const supportedMimeType = pickSupportedRecorderMimeType()
-
-      if (
-        isFastTranscribeMode &&
-        supportedMimeType &&
-        !isOverlapSafeMimeType(supportedMimeType)
-      ) {
-        setErrorMessage(
-          `Fast mode overlap is not supported for ${supportedMimeType} in this browser. Use slow mode.`,
-        )
-        stream.getTracks().forEach((track) => track.stop())
+        setErrorMessage('No microphone audio track captured.')
         return
       }
 
-      const mediaRecorder = supportedMimeType
-        ? new MediaRecorder(recordingStream, { mimeType: supportedMimeType })
-        : new MediaRecorder(recordingStream)
-
+      const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       mediaStreamRef.current = stream
 
+      const speechEvents = hark(stream, { threshold: -65, interval: 100 })
+      harkRef.current = speechEvents
+
+      const sliceAndResetChunk = () => {
+        if (hasSpokenInChunkRef.current && mediaRecorderRef.current?.state === 'recording') {
+          sliceIsValidRef.current = true
+          mediaRecorderRef.current.requestData()
+          hasSpokenInChunkRef.current = false
+          if (maxChunkTimeoutRef.current !== undefined) {
+            window.clearTimeout(maxChunkTimeoutRef.current)
+            maxChunkTimeoutRef.current = undefined
+          }
+        }
+      }
+
+      speechEvents.on('speaking', () => {
+        if (silenceTimeoutRef.current !== undefined) {
+          window.clearTimeout(silenceTimeoutRef.current)
+        }
+        
+        if (!hasSpokenInChunkRef.current) {
+          if (maxChunkTimeoutRef.current !== undefined) {
+            window.clearTimeout(maxChunkTimeoutRef.current)
+          }
+          maxChunkTimeoutRef.current = window.setTimeout(() => {
+            sliceAndResetChunk()
+          }, 6000)
+        }
+
+        hasSpokenInChunkRef.current = true
+      })
+
+      speechEvents.on('stopped_speaking', () => {
+        silenceTimeoutRef.current = window.setTimeout(() => {
+          sliceAndResetChunk()
+        }, 1000)
+      })
+
       mediaRecorder.ondataavailable = (event) => {
         if (!event.data || event.data.size < 1000) return
-        enqueueTranscriptionChunk(event.data)
+        if (sliceIsValidRef.current) {
+          enqueueTranscriptionChunk(event.data)
+          sliceIsValidRef.current = false
+        }
       }
 
       mediaRecorder.start()
-
-      const intervalMs = isFastTranscribeMode ? 6000 : 30000;
-      recordingIntervalRef.current = window.setInterval(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
-          mediaRecorderRef.current.start();
-        }
-      }, intervalMs);
-
       setIsRecording(true)
-      // Switch to session view when recording starts
       setActiveView('session')
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Could not access microphone capture.'))
+      setErrorMessage(getErrorMessage(error, 'Could not access microphone.'))
       stopRecordingStream()
       setIsRecording(false)
     }
   }
 
   function stopRecordingStream() {
-    if (recordingIntervalRef.current !== undefined) {
-      window.clearInterval(recordingIntervalRef.current)
-      recordingIntervalRef.current = undefined
+    if (silenceTimeoutRef.current !== undefined) {
+      window.clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = undefined
     }
 
-    lastSuggestionGenAtRef.current = 0;
-    lastGapSummaryGenAtRef.current = 0;
+    if (maxChunkTimeoutRef.current !== undefined) {
+      window.clearTimeout(maxChunkTimeoutRef.current)
+      maxChunkTimeoutRef.current = undefined
+    }
+
+    if (harkRef.current) {
+      harkRef.current.stop()
+      harkRef.current = null
+    }
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
@@ -312,6 +341,10 @@ function App() {
     mediaRecorderRef.current = null
     mediaStreamRef.current = null
 
+    hasSpokenInChunkRef.current = false
+
+    lastSuggestionGenAtRef.current = 0;
+    lastGapSummaryGenAtRef.current = 0;
     transcriptionQueueRef.current = []
     isProcessingTranscriptionQueueRef.current = false
   }
@@ -474,13 +507,7 @@ function App() {
     await refreshSuggestions()
   }
 
-  function toggleFastTranscribeMode() {
-    if (isRecording) {
-      setErrorMessage('Stop mic before changing transcription mode.')
-      return
-    }
-    setIsFastTranscribeMode((previous) => !previous)
-  }
+
 
   function toggleLargeModel() {
     setSettings((prev) => ({
@@ -672,13 +699,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <HistorySidebar
-        databaseUrl={settings.databaseUrl}
-        currentSessionId={sessionId}
-        onSelectSession={loadPastSessionFromDB}
-        onNewChat={handleNewChat}
-        activeView={activeView}
-      />
+
       <div className="app-shell">
         <TopNav 
           activeTab={activeView} 
@@ -700,9 +721,7 @@ function App() {
               lastSuggestionLatencyMs={lastSuggestionLatencyMs}
               lastChatLatencyMs={lastChatLatencyMs}
               lastRefreshAt={lastRefreshAt}
-              isFastTranscribeMode={isFastTranscribeMode}
               isLargeModel={isLargeModel}
-              onToggleFastTranscribeMode={toggleFastTranscribeMode}
               onToggleLargeModel={toggleLargeModel}
               onToggleRecording={toggleRecording}
               onManualRefresh={handleManualRefresh}
@@ -714,7 +733,7 @@ function App() {
 
             {!hasSessionData ? (
               <div className="hint-banner">
-                Start microphone recording. {isFastTranscribeMode ? 'Fast mode uses 3s chunks with overlap.' : 'Slow mode uses 30s chunks.'} Suggestions refresh every ~{suggestionCadenceSeconds}s.
+                Start microphone recording. Hark semantic speech detection isolates valid audio dynamically. Suggestions refresh every ~{suggestionCadenceSeconds}s.
               </div>
             ) : null}
 

@@ -77,7 +77,9 @@ export function SuggestionsPanel({
                     className="suggestion-card"
                     onClick={() => onSelectSuggestion(item, batch)}
                   >
-                    <span className="suggestion-type">{prettyType(item.type)}</span>
+                    <span className={`suggestion-type suggestion-type--${item.type}`}>
+                      {prettyType(item.type)}
+                    </span>
                     <p>{item.preview}</p>
                     <small>{item.whyNow}</small>
                   </button>

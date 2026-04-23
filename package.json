@@ -15,15 +15,21 @@
   },
   "dependencies": {
     "groq-sdk": "^1.1.2",
+    "hark": "^1.2.3",
     "idb": "^8.0.3",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "react-markdown": "^9.0.3",
+    "react-syntax-highlighter": "^15.6.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@types/hark": "^1.2.3",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.1.1",

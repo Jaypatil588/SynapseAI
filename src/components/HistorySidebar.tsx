@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { fetchPastSessions, type DBSession } from '../lib/db';
-import { formatTime } from '../lib/utils';
 
 type HistorySidebarProps = {
   databaseUrl: string;
@@ -51,11 +50,7 @@ export function HistorySidebar({
     return date.toDateString() === yesterday.toDateString();
   });
 
-  const olderSessions = sessions.filter(s => {
-    const date = new Date(s.created_at);
-    return date.toDateString() !== today.toDateString() && 
-           date.toDateString() !== yesterday.toDateString();
-  });
+
 
   return (
     <aside className="history-sidebar">

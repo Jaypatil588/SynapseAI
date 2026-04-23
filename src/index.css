@@ -43,7 +43,8 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg-base);
   /* Warm ambient glow effect */
   background-image: 
@@ -52,7 +53,7 @@ body {
 }
 
 button, input, textarea { font: inherit; }
-#root { min-height: 100vh; }
+#root { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
 /* SCROLLBAR */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -63,7 +64,7 @@ button, input, textarea { font: inherit; }
 /* ─── LAYOUT ─── */
 .app-container {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background: transparent;
 }
 
@@ -307,8 +308,9 @@ button, input, textarea { font: inherit; }
   min-width: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   background: transparent;
+  overflow: hidden;
 }
 
 /* ─── TOP NAV ─── */
@@ -617,6 +619,8 @@ button, input, textarea { font: inherit; }
   flex-direction: column;
   padding: 0.75rem;
   gap: 0.6rem;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* ─── CONTROL BAR ─── */
@@ -735,6 +739,7 @@ button, input, textarea { font: inherit; }
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0.6rem;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── PANEL ─── */
@@ -1198,4 +1203,57 @@ button, input, textarea { font: inherit; }
   .top-nav { padding: 0.75rem 1rem; gap: 1rem; }
   .top-nav__links { gap: 1rem; }
   .dashboard-view { padding: 1.5rem 1rem 3rem; }
+}
+
+/* Markdown Overrides */
+.markdown-body {
+  line-height: 1.5;
+}
+.markdown-body p:not(:last-child) {
+  margin-bottom: 0.75rem;
+}
+.markdown-body ul, .markdown-body ol {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-body pre {
+  margin: 0.75rem 0;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 0.85rem;
+}
+.markdown-body code:not(pre code) {
+  background: var(--surface);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85em;
+  color: var(--primary);
+}
+
+/* Suggestion Category Badges */
+.suggestion-type--question_to_ask {
+  background-color: rgba(0, 229, 255, 0.15) !important;
+  color: #00E5FF !important;
+  border: 1px solid rgba(0, 229, 255, 0.3) !important;
+}
+.suggestion-type--talking_point {
+  background-color: rgba(57, 255, 20, 0.15) !important;
+  color: #39FF14 !important;
+  border: 1px solid rgba(57, 255, 20, 0.3) !important;
+}
+.suggestion-type--answer {
+  background-color: rgba(255, 0, 127, 0.15) !important;
+  color: #FF007F !important;
+  border: 1px solid rgba(255, 0, 127, 0.3) !important;
+}
+.suggestion-type--fact_check {
+  background-color: rgba(255, 94, 0, 0.15) !important;
+  color: #FF5E00 !important;
+  border: 1px solid rgba(255, 94, 0, 0.3) !important;
+}
+.suggestion-type--clarification {
+  background-color: rgba(255, 240, 0, 0.15) !important;
+  color: #FFF000 !important;
+  border: 1px solid rgba(255, 240, 0, 0.3) !important;
 }

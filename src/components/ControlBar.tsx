@@ -8,9 +8,7 @@ type ControlBarProps = {
   lastSuggestionLatencyMs: number | null
   lastChatLatencyMs: number | null
   lastRefreshAt: string | null
-  isFastTranscribeMode: boolean
   isLargeModel: boolean
-  onToggleFastTranscribeMode: () => void
   onToggleLargeModel: () => void
   onToggleRecording: () => void
   onManualRefresh: () => void
@@ -26,9 +24,7 @@ export function ControlBar({
   lastSuggestionLatencyMs,
   lastChatLatencyMs,
   lastRefreshAt,
-  isFastTranscribeMode,
   isLargeModel,
-  onToggleFastTranscribeMode,
   onToggleLargeModel,
   onToggleRecording,
   onManualRefresh,
@@ -46,14 +42,6 @@ export function ControlBar({
         <button className={isRecording ? 'danger' : 'primary'} onClick={onToggleRecording}>
           {isRecording ? 'Stop Recording' : 'Start Mic'}
         </button>
-        <label className="toggle-row" style={{ marginRight: '8px', marginLeft: '4px' }}>
-          <input
-            type="checkbox"
-            checked={isFastTranscribeMode}
-            onChange={onToggleFastTranscribeMode}
-          />
-          <span>Fast Mode</span>
-        </label>
         <button
           onClick={onToggleLargeModel}
           title={isLargeModel ? 'Using gpt-oss-120b (click to switch to 20b)' : 'Using gpt-oss-20b (click to switch to 120b)'}

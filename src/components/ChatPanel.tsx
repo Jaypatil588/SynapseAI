@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { formatTime } from '../lib/utils'
 import type { ChatMessage } from '../types'
 
@@ -56,7 +60,33 @@ export function ChatPanel({
                 <strong>{message.role === 'user' ? 'You' : 'TwinMind'}</strong>
                 <time>{formatTime(message.timestamp)}</time>
               </header>
-              <p>{message.content}</p>
+              <div className="markdown-body">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code({ className, children, ...rest }) {
+                      const match = /language-(\w+)/.exec(className || '')
+                      return match ? (
+                        <SyntaxHighlighter
+                          // @ts-expect-error React 19 typings 
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          {...rest}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      ) : (
+                        <code className={className} {...rest}>
+                          {children}
+                        </code>
+                      )
+                    }
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
             </article>
           ))
         )}
