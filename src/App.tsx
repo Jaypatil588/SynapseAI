@@ -805,4 +805,3 @@ function tokenize(value: string): string[] {
     .filter(Boolean)
 }
 
-export default App
