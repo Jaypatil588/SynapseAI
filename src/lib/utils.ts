@@ -25,6 +25,8 @@ export function transcriptToContext(entries: TranscriptEntry[], limit: number): 
     .slice(-limit)
     .map((entry) => `[${formatTime(entry.timestamp)}] ${entry.text}`)
     .join('\n')
+}
+
 export type BoundedContext = {
   head: string
   tail: string
